@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "MediaLens"
-    app_version: str = "1.0.0"
+    app_version: str = "1.1.0"
     api_v1_prefix: str = "/api/v1"
     database_url: str = "sqlite:////data/medialens.db"
     cors_origins: Annotated[list[str], NoDecode] = [
