@@ -1,5 +1,5 @@
 FROM node:22-alpine AS frontend-build
-ARG MEDIALENS_BUILD_VERSION=1.0.0
+ARG MEDIALENS_BUILD_VERSION=1.1.0
 WORKDIR /frontend
 COPY frontend/package.json ./
 RUN npm install
@@ -8,10 +8,12 @@ RUN sed -i "s/0.6.2-dev/${MEDIALENS_BUILD_VERSION}/g" src/App.tsx \
     && npm run build
 
 FROM python:3.12-slim
+ARG MEDIALENS_BUILD_VERSION=1.1.0
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    MEDIALENS_APP_VERSION=${MEDIALENS_BUILD_VERSION}
 
 WORKDIR /app
 
