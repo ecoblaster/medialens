@@ -2,19 +2,19 @@
 
 MediaLens is a read-only media library analyzer for movies and TV shows. It scans local media with FFprobe and MediaInfo, presents HDR and audio capability information, evaluates playback-device compatibility, and automatically imports new files after they finish copying.
 
-## MediaLens 1.0.0
+## MediaLens 1.1.0
 
 The stable image is published as:
 
 ```text
-ecoblaster/medialens:1.0.0
+ecoblaster/medialens:1.1.0
 ecoblaster/medialens:latest
 ```
 
 A GitHub Container Registry mirror is also available:
 
 ```text
-ghcr.io/ecoblaster/medialens:1.0.0
+ghcr.io/ecoblaster/medialens:1.1.0
 ghcr.io/ecoblaster/medialens:latest
 ```
 
@@ -31,7 +31,7 @@ docker run -d \
   -v /mnt/user/appdata/medialens:/data \
   -v "/mnt/user/Media/Movies:/media/movies:ro" \
   -v "/mnt/user/Media/TV Shows:/media/tv:ro" \
-  ecoblaster/medialens:1.0.0
+  ecoblaster/medialens:1.1.0
 ```
 
 Open MediaLens at `http://<server-address>:8090`.
@@ -53,13 +53,15 @@ Use these values when adding the container manually:
 
 | Setting | Value |
 |---|---|
-| Repository | `ecoblaster/medialens:1.0.0` |
+| Repository | `ecoblaster/medialens:latest` |
 | WebUI | `http://[IP]:[PORT:8080]` |
 | Container port | `8080` |
 | Suggested host port | `8090` |
 | App data container path | `/data` |
 | Movies container path | `/media/movies` (read-only) |
 | TV container path | `/media/tv` (read-only) |
+
+Using `latest` allows Unraid to detect newly published stable images. To pin the installation to a specific release instead, use a numbered tag such as `ecoblaster/medialens:1.1.0`; pinned containers must be changed manually when moving to a later version.
 
 Recommended variables:
 
@@ -69,80 +71,24 @@ Recommended variables:
 | `MEDIALENS_FILE_STABILITY_SECONDS` | `60` |
 | `MEDIALENS_RECONCILE_MINUTES` | `15` |
 
-## First-run library setup
+## First-run setup wizard
 
-MediaLens stores registered libraries and scan results in `/data/medialens.db`. If the new container uses an empty app-data directory, register the libraries once through the API documentation page.
+MediaLens 1.1 includes a guided setup wizard for empty installations.
 
-If you reused an existing `/data` mapping, first check whether the libraries are already present:
+1. Open `http://<server-address>:8090`.
+2. Choose whether to add Movies, TV Shows, or both.
+3. Confirm the prefilled container paths `/media/movies` and `/media/tv`.
+4. Optionally change the library names or container paths.
+5. Choose whether to begin the initial full scans immediately.
+6. Finish setup and follow scan progress from the dashboard.
 
-1. Open `http://<server-address>:8090/docs`.
-2. Expand `GET /api/v1/libraries`.
-3. Select **Try it out**, then **Execute**.
-4. If the response already lists your movie and TV libraries, no further registration is needed.
-5. If the response is `[]`, create the libraries as described below.
+The wizard appears only when no libraries are registered. Existing installations that reuse the same `/data` mapping continue directly to the dashboard with their libraries and scan history intact.
 
-### Register the movie library
-
-1. In the API documentation, expand `POST /api/v1/libraries`.
-2. Select **Try it out**.
-3. Replace the request body with:
-
-```json
-{
-  "name": "Movies",
-  "media_kind": "movies",
-  "source_type": "filesystem",
-  "root_path": "/media/movies",
-  "external_id": null,
-  "enabled": true
-}
-```
-
-4. Select **Execute**.
-5. A successful request returns HTTP `201` and the new library record.
-
-### Register the TV library
-
-Repeat `POST /api/v1/libraries` with:
-
-```json
-{
-  "name": "TV Shows",
-  "media_kind": "tv",
-  "source_type": "filesystem",
-  "root_path": "/media/tv",
-  "external_id": null,
-  "enabled": true
-}
-```
-
-Always use the container paths `/media/movies` and `/media/tv` here, not the original Unraid host paths.
-
-### Run the initial scans
-
-After registering the libraries:
-
-1. Run `GET /api/v1/libraries` and copy the `id` of the library you want to scan.
-2. Expand `POST /api/v1/scans`.
-3. Select **Try it out**.
-4. Submit a full-library scan using the copied library ID:
-
-```json
-{
-  "library_id": "YOUR-LIBRARY-UUID",
-  "mode": "full",
-  "relative_path": null,
-  "force": false
-}
-```
-
-5. Repeat the scan for the other library.
-6. Open `http://<server-address>:8090` to follow progress and browse the results.
-
-Automatic scanning is enabled by default. After the initial full scans, MediaLens watches the registered libraries for new, changed, renamed, and deleted media files.
+Advanced library management remains available through the API documentation at `http://<server-address>:8090/docs`.
 
 ## Main features
 
+- Guided first-run library setup
 - Dolby Vision profile, HDR10, HDR10+, and SDR analysis
 - Dolby Atmos, DTS:X, lossless audio, subtitle, bitrate, and codec analysis
 - Hardware compatibility profiles for NVIDIA Shield, Apple TV, Fire TV Cube, and Ugoos devices
@@ -154,7 +100,13 @@ Automatic scanning is enabled by default. After the initial full scans, MediaLen
 
 MediaLens stores its SQLite database under `/data`. Keep that directory persistent when recreating or upgrading the container.
 
-To upgrade the stable image:
+For an Unraid installation using the `latest` tag:
+
+1. Select **Check for Updates** on the Docker page.
+2. Apply the MediaLens update when a new image is available.
+3. Keep the existing `/data`, `/media/movies`, and `/media/tv` mappings unchanged.
+
+For a command-line installation:
 
 ```bash
 docker pull ecoblaster/medialens:latest
