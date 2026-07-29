@@ -1,0 +1,74 @@
+diff --git a/backend/tests/test_media_paths.py b/backend/tests/test_media_paths.py
+--- a/backend/tests/test_media_paths.py
++++ b/backend/tests/test_media_paths.py
+@@ -5,15 +5,20 @@ from app.services.media_paths import ignored_media_reason, is_supported_media_path
+ 
+ 
+ def test_normal_media_files_are_supported() -> None:
+-    assert is_supported_media_path(Path("Movies/The Big Sick (2017)/The.Big.Sick.2017.mkv"))
+-    assert is_supported_media_path(Path("TV/President Curtis/Season 1/S01E01.mkv"))
++    assert is_supported_media_path(
++        Path("Movies/Example Movie (2024)/Example.Movie.2024.mkv")
++    )
++    assert is_supported_media_path(
++        Path("TV/Example Series/Season 01/Example.Series.S01E01.mkv")
++    )
+ 
+ 
+ def test_sample_directories_are_ignored() -> None:
+     path = Path(
+-        "TV/Batwoman/S3/Batwoman.S03E01.1080p.WEB.h264-GOSSIP/"
+-        "Sample/batwoman.s03e01.1080p.web.h264-gossip-sample.mkv"
++        "TV/Example Series/Season 03/"
++        "Example.Series.S03E01.1080p.WEB.h264-GROUP/"
++        "Sample/example.series.s03e01.1080p.web.h264-group-sample.mkv"
+     )
+     assert ignored_media_reason(path) == "sample_directory"
+     assert not is_supported_media_path(path)
+@@ -28,8 +33,8 @@ def test_sample_filename_variants_are_ignored() -> None:
+ 
+ def test_release_group_promotional_video_is_ignored() -> None:
+     path = Path(
+-        "Movies/Justice.League.Crisis.On.Two.Earths.2010.1080p.BluRay.H264.AAC-RARBG/"
++        "Movies/Example.Movie.2024.1080p.BluRay.H264.AAC-GROUP/"
+         "RARBG.COM.mp4"
+     )
+     assert ignored_media_reason(path) == "release_group_promo"
+diff --git a/docs/GETTING_STARTED.md b/docs/GETTING_STARTED.md
+--- a/docs/GETTING_STARTED.md
++++ b/docs/GETTING_STARTED.md
+@@ -2,9 +2,9 @@
+ 
+-MediaLens v0.2 adds the first real media scanner. It can analyze one file from a
+-registered filesystem library with `ffprobe` and MediaInfo, store its video,
+-audio, and subtitle streams, and return the result through the API.
++MediaLens 1.0 can analyze registered filesystem libraries with `ffprobe` and
++MediaInfo, store normalized video, audio, subtitle, HDR, and compatibility
++metadata, and return the results through the API.
+@@ -36,8 +36,8 @@ Open:
+ 
+-- API documentation: <http://YOUR-UNRAID-IP:8090/docs>
+-- Health check: <http://YOUR-UNRAID-IP:8090/api/v1/health>
++- API documentation: <http://SERVER-IP:8090/docs>
++- Health check: <http://SERVER-IP:8090/api/v1/health>
+@@ -84,7 +84,7 @@ Example:
+ {
+   "library_id": "YOUR-LIBRARY-UUID",
+   "mode": "single_file",
+-  "relative_path": "Dune (2021)/Dune (2021).mkv",
++  "relative_path": "Example Movie (2024)/Example.Movie.2024.mkv",
+   "force": false
+ }
+diff --git a/README_APPEND.md b/README_APPEND.md
+deleted file mode 100644
+--- a/README_APPEND.md
++++ /dev/null
+@@ -1,8 +0,0 @@
+-## Development status
+-
+-MediaLens is currently in early development. The first milestone provides a
+-FastAPI backend, SQLite database schema, Alembic migrations, and library
+-management endpoints.
+-
+-See [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) for local and Docker
+-setup instructions.

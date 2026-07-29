@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">MediaLens</title>
+  <desc id="description">A cyan media play symbol inside a camera lens and eye.</desc>
+  <defs>
+    <radialGradient id="background" cx="50%" cy="42%" r="78%">
+      <stop offset="0" stop-color="#102d68"/>
+      <stop offset="0.5" stop-color="#071d4c"/>
+      <stop offset="1" stop-color="#020b23"/>
+    </radialGradient>
+    <linearGradient id="cyan" x1="30" y1="46" x2="222" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#64f7ff"/>
+      <stop offset="0.45" stop-color="#05e9ed"/>
+      <stop offset="1" stop-color="#00bfdc"/>
+    </linearGradient>
+    <linearGradient id="play" x1="104" y1="91" x2="169" y2="166" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6dffff"/>
+      <stop offset="1" stop-color="#05dce8"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="256" height="256" rx="50" fill="url(#background)"/>
+
+  <path d="M31 128C55 84 89 62 128 62s73 22 97 66c-24 44-58 66-97 66s-73-22-97-66Z"
+        fill="none" stroke="url(#cyan)" stroke-width="14" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <circle cx="128" cy="128" r="46" fill="#061638" stroke="#173b7a" stroke-width="13"/>
+  <circle cx="128" cy="128" r="46" fill="none" stroke="url(#cyan)" stroke-width="13"
+          stroke-linecap="butt" stroke-dasharray="58 231" stroke-dashoffset="-8" transform="rotate(-22 128 128)"/>
+  <circle cx="128" cy="128" r="46" fill="none" stroke="url(#cyan)" stroke-width="13"
+          stroke-linecap="butt" stroke-dasharray="49 240" stroke-dashoffset="-15" transform="rotate(134 128 128)"/>
+
+  <path d="M111 99.5c0-6.2 6.8-10 12.1-6.7l51.3 31.7c5 3.1 5 10.4 0 13.5l-51.3 31.7c-5.3 3.3-12.1-.5-12.1-6.7V99.5Z"
+        fill="url(#play)" filter="url(#glow)"/>
+</svg>

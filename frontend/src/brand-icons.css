@@ -1,0 +1,31 @@
+/* Bundled format logos rendered as normal images for reliable Chromium support. */
+.metrics .metric:nth-child(3) > span,
+.metrics .metric:nth-child(4) > span,
+.metrics .metric:nth-child(5) > span {
+  width: 92px;
+  height: 52px;
+  flex: 0 0 92px;
+  padding: 9px;
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1px solid rgb(255 255 255 / 30%);
+  box-shadow: inset 0 0 0 1px rgb(15 23 42 / 6%), 0 8px 18px rgb(0 0 0 / 18%);
+}
+
+.brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@media (max-width: 1500px) and (min-width: 1201px) {
+  .metrics .metric:nth-child(3) > span,
+  .metrics .metric:nth-child(4) > span,
+  .metrics .metric:nth-child(5) > span {
+    width: 76px;
+    height: 48px;
+    flex-basis: 76px;
+    padding: 8px;
+  }
+}

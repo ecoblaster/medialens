@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: medialens-api
+    environment:
+      MEDIALENS_APP_NAME: ${MEDIALENS_APP_NAME:-MediaLens}
+      MEDIALENS_APP_VERSION: ${MEDIALENS_APP_VERSION:-1.0.0}
+      MEDIALENS_API_V1_PREFIX: ${MEDIALENS_API_V1_PREFIX:-/api/v1}
+      MEDIALENS_DATABASE_URL: ${MEDIALENS_DATABASE_URL:-sqlite:////data/medialens.db}
+      MEDIALENS_CORS_ORIGINS: ${MEDIALENS_CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      MEDIALENS_AUTO_SCAN_ENABLED: ${MEDIALENS_AUTO_SCAN_ENABLED:-true}
+      MEDIALENS_FILE_STABILITY_SECONDS: ${MEDIALENS_FILE_STABILITY_SECONDS:-60}
+      MEDIALENS_RECONCILE_MINUTES: ${MEDIALENS_RECONCILE_MINUTES:-15}
+    ports:
+      - "${MEDIALENS_HOST_PORT:-8090}:8080"
+    volumes:
+      - "${MEDIALENS_DATA_PATH:-./data}:/data"
+      # Media libraries are always mounted read-only. Override these paths in .env.
+      - "${MEDIALENS_MOVIES_PATH:-./example-media/movies}:/media/movies:ro"
+      - "${MEDIALENS_TV_PATH:-./example-media/tv}:/media/tv:ro"
+    restart: unless-stopped
+    healthcheck:
+      # Health checks run inside the container, where MediaLens listens on 8080.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/v1/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
