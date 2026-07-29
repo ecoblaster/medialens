@@ -69,6 +69,78 @@ Recommended variables:
 | `MEDIALENS_FILE_STABILITY_SECONDS` | `60` |
 | `MEDIALENS_RECONCILE_MINUTES` | `15` |
 
+## First-run library setup
+
+MediaLens stores registered libraries and scan results in `/data/medialens.db`. If the new container uses an empty app-data directory, register the libraries once through the API documentation page.
+
+If you reused an existing `/data` mapping, first check whether the libraries are already present:
+
+1. Open `http://<server-address>:8090/docs`.
+2. Expand `GET /api/v1/libraries`.
+3. Select **Try it out**, then **Execute**.
+4. If the response already lists your movie and TV libraries, no further registration is needed.
+5. If the response is `[]`, create the libraries as described below.
+
+### Register the movie library
+
+1. In the API documentation, expand `POST /api/v1/libraries`.
+2. Select **Try it out**.
+3. Replace the request body with:
+
+```json
+{
+  "name": "Movies",
+  "media_kind": "movies",
+  "source_type": "filesystem",
+  "root_path": "/media/movies",
+  "external_id": null,
+  "enabled": true
+}
+```
+
+4. Select **Execute**.
+5. A successful request returns HTTP `201` and the new library record.
+
+### Register the TV library
+
+Repeat `POST /api/v1/libraries` with:
+
+```json
+{
+  "name": "TV Shows",
+  "media_kind": "tv",
+  "source_type": "filesystem",
+  "root_path": "/media/tv",
+  "external_id": null,
+  "enabled": true
+}
+```
+
+Always use the container paths `/media/movies` and `/media/tv` here, not the original Unraid host paths.
+
+### Run the initial scans
+
+After registering the libraries:
+
+1. Run `GET /api/v1/libraries` and copy the `id` of the library you want to scan.
+2. Expand `POST /api/v1/scans`.
+3. Select **Try it out**.
+4. Submit a full-library scan using the copied library ID:
+
+```json
+{
+  "library_id": "YOUR-LIBRARY-UUID",
+  "mode": "full",
+  "relative_path": null,
+  "force": false
+}
+```
+
+5. Repeat the scan for the other library.
+6. Open `http://<server-address>:8090` to follow progress and browse the results.
+
+Automatic scanning is enabled by default. After the initial full scans, MediaLens watches the registered libraries for new, changed, renamed, and deleted media files.
+
 ## Main features
 
 - Dolby Vision profile, HDR10, HDR10+, and SDR analysis
