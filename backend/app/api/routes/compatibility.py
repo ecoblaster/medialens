@@ -18,6 +18,10 @@ from app.services.compatibility import (
     get_device_profile,
     list_device_profiles,
 )
+from app.services.google_tv_compatibility import (
+    get_google_tv_device_profile,
+    list_google_tv_device_profiles,
+)
 from app.services.homatics_compatibility import (
     get_homatics_device_profile,
     list_homatics_device_profiles,
@@ -45,11 +49,19 @@ def _media_query():
 
 
 def _all_device_profiles() -> list[DeviceProfile]:
-    return [*list_device_profiles(), *list_homatics_device_profiles()]
+    return [
+        *list_device_profiles(),
+        *list_google_tv_device_profiles(),
+        *list_homatics_device_profiles(),
+    ]
 
 
 def _profile_or_404(device_id: str) -> DeviceProfile:
-    profile = get_device_profile(device_id) or get_homatics_device_profile(device_id)
+    profile = (
+        get_device_profile(device_id)
+        or get_google_tv_device_profile(device_id)
+        or get_homatics_device_profile(device_id)
+    )
     if profile is None:
         raise HTTPException(
             status_code=404,
