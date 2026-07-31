@@ -24,6 +24,11 @@ if settings.database_url.startswith("sqlite"):
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
+# Importing the service registers its SQLAlchemy session listeners. Keeping this
+# beside SessionLocal ensures scanner, API, watcher, and test sessions all apply
+# the same multi-version grouping rules.
+from app.services import media_versions as _media_versions  # noqa: E402,F401
+
 
 def get_db() -> Generator[Session, None, None]:
     with SessionLocal() as session:
