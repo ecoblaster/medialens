@@ -13,10 +13,12 @@ from app.core.errors import http_exception_handler
 from app.db.base import utc_now
 from app.db.session import SessionLocal
 from app.models.enums import ScanRunStatus
+from app.models.library import Library
 from app.models.scan import ScanRun
 import app.services.library_watcher as library_watcher_module
 from app.services.library_watcher import library_watcher
 from app.services.media_paths import is_supported_media_path
+from app.services.media_versions import synchronize_library_versions
 
 
 @asynccontextmanager
@@ -42,6 +44,14 @@ async def lifespan(_: FastAPI):
             scan.completed_at = utc_now()
             scan.error_message = "Scan was cancelled because the MediaLens service restarted."
         if orphaned:
+            db.commit()
+
+        # Upgrade existing databases immediately, including files that are
+        # unchanged and would otherwise be skipped by the next scanner pass.
+        library_ids = list(db.scalars(select(Library.id)).all())
+        for library_id in library_ids:
+            synchronize_library_versions(db, library_id)
+        if library_ids:
             db.commit()
 
     # Keep the existing watcher implementation isolated while installing the

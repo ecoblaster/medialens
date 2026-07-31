@@ -84,6 +84,9 @@ class MediaFileRead(BaseModel):
     library_id: str
     relative_path: str
     filename: str
+    version_label: str | None
+    part_index: int
+    is_primary: bool
     container: str | None
     size_bytes: int
     duration_ms: int | None
