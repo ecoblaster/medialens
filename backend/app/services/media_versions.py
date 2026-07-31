@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.models.library import Library
 from app.models.media import MediaFile, MediaItem, VideoStream
 
 _AFFECTED_LIBRARIES = "medialens_media_version_libraries"
@@ -170,6 +171,31 @@ def synchronize_library_versions(session: Session, library_id: str) -> None:
                 media_file.is_primary = should_be_primary
 
 
+def _library_reference(obj: object) -> str | Library | None:
+    """Resolve a library before or after SQLAlchemy assigns foreign-key defaults.
+
+    New objects can have relationships populated while ``library_id`` is still
+    ``None`` during ``before_flush``. Keep the related Library object as a
+    temporary reference; its generated ID is available in ``after_flush_postexec``.
+    """
+    if isinstance(obj, MediaFile):
+        if obj.library_id:
+            return obj.library_id
+        if obj.library is not None:
+            return obj.library
+        if obj.media_item is not None:
+            if obj.media_item.library_id:
+                return obj.media_item.library_id
+            if obj.media_item.library is not None:
+                return obj.media_item.library
+    elif isinstance(obj, MediaItem):
+        if obj.library_id:
+            return obj.library_id
+        if obj.library is not None:
+            return obj.library
+    return None
+
+
 @event.listens_for(Session, "before_flush")
 def _remember_affected_libraries(
     session: Session,
@@ -178,23 +204,23 @@ def _remember_affected_libraries(
 ) -> None:
     if session.info.get(_SYNCHRONIZING):
         return
-    library_ids = session.info.setdefault(_AFFECTED_LIBRARIES, set())
-    for obj in session.new.union(session.dirty):
-        if isinstance(obj, MediaFile):
-            library_id = obj.library_id or (
-                obj.media_item.library_id if obj.media_item else None
-            )
-            if library_id:
-                library_ids.add(library_id)
-        elif isinstance(obj, MediaItem) and obj.library_id:
-            library_ids.add(obj.library_id)
+    library_refs = session.info.setdefault(_AFFECTED_LIBRARIES, set())
+    for obj in session.new.union(session.dirty).union(session.deleted):
+        reference = _library_reference(obj)
+        if reference is not None:
+            library_refs.add(reference)
 
 
 @event.listens_for(Session, "after_flush_postexec")
 def _group_and_label_versions(session: Session, _flush_context: object) -> None:
     if session.info.get(_SYNCHRONIZING):
         return
-    library_ids = session.info.pop(_AFFECTED_LIBRARIES, set())
+    library_refs = session.info.pop(_AFFECTED_LIBRARIES, set())
+    library_ids = {
+        reference if isinstance(reference, str) else reference.id
+        for reference in library_refs
+        if isinstance(reference, str) or reference.id is not None
+    }
     if not library_ids:
         return
 
