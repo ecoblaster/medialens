@@ -98,7 +98,7 @@ def _primary_rank(media_file: MediaFile) -> tuple[int, int, int, int, str]:
     video = _primary_video(media_file)
     return (
         (video.width or 0) * (video.height or 0) if video else 0,
-        video.bitrate or 0 if video else 0,
+        (video.bitrate or 0) if video else 0,
         media_file.overall_bitrate or 0,
         media_file.size_bytes,
         media_file.relative_path.casefold(),
