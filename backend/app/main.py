@@ -13,10 +13,12 @@ from app.core.errors import http_exception_handler
 from app.db.base import utc_now
 from app.db.session import SessionLocal
 from app.models.enums import ScanRunStatus
+from app.models.library import Library
 from app.models.scan import ScanRun
 import app.services.library_watcher as library_watcher_module
 from app.services.library_watcher import library_watcher
 from app.services.media_paths import is_supported_media_path
+from app.services.media_versions import synchronize_library_versions
 
 
 @asynccontextmanager
@@ -42,6 +44,16 @@ async def lifespan(_: FastAPI):
             scan.completed_at = utc_now()
             scan.error_message = "Scan was cancelled because the MediaLens service restarted."
         if orphaned:
+            db.commit()
+
+        # Existing installations may already contain one MediaItem per physical
+        # file. Reconcile them once at startup so upgrading immediately exposes
+        # 1080p, 4K, remux, and HDR variants under the same title without a
+        # destructive migration or forced media probe.
+        library_ids = list(db.scalars(select(Library.id)).all())
+        for library_id in library_ids:
+            synchronize_library_versions(db, library_id)
+        if library_ids:
             db.commit()
 
     # Keep the existing watcher implementation isolated while installing the
@@ -74,37 +86,28 @@ app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 frontend_dir = Path("/app/frontend")
 assets_dir = frontend_dir / "assets"
-brands_dir = frontend_dir / "brands"
-
 if assets_dir.exists():
-    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+brands_dir = frontend_dir / "brands"
 if brands_dir.exists():
-    app.mount("/brands", StaticFiles(directory=brands_dir), name="brands")
+    app.mount("/brands", StaticFiles(directory=brands_dir), name="frontend-brands")
+
+favicon_path = frontend_dir / "favicon.png"
 
 
-@app.get("/", include_in_schema=False)
-def root():
-    index = frontend_dir / "index.html"
-    if index.exists():
-        return FileResponse(index)
-    return {"name": settings.app_name, "version": settings.app_version, "docs": "/docs"}
-
-
-@app.get("/favicon.svg", include_in_schema=False)
-def favicon_svg():
-    favicon = frontend_dir / "favicon.svg"
-    if favicon.exists():
-        return FileResponse(favicon, media_type="image/svg+xml")
-    raise HTTPException(status_code=404, detail="Favicon not found")
+@app.get("/favicon.png", include_in_schema=False)
+def favicon() -> FileResponse:
+    if favicon_path.exists():
+        return FileResponse(favicon_path)
+    raise HTTPException(status_code=404, detail="Favicon is not built")
 
 
 @app.get("/{full_path:path}", include_in_schema=False)
-def frontend_fallback(full_path: str):
-    if full_path.startswith(("api/", "docs", "openapi.json", "redoc")):
-        raise HTTPException(status_code=404, detail="Not found")
-    public_file = (frontend_dir / full_path).resolve()
-    if public_file.is_relative_to(frontend_dir) and public_file.is_file():
-        return FileResponse(public_file)
+def frontend(full_path: str) -> FileResponse:
+    requested = frontend_dir / full_path
+    if full_path and requested.is_file():
+        return FileResponse(requested)
     index = frontend_dir / "index.html"
     if index.exists():
         return FileResponse(index)
