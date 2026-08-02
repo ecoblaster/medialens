@@ -19,6 +19,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 const pairs = (value?: Record<string, number>) => Object.entries(value || {}).map(([name, count]) => ({ name, count }))
+const codecLabel = (codec: string) => ({ h264: 'H.264', h265: 'H.265', hevc: 'HEVC', av1: 'AV1', vp9: 'VP9' }[codec.toLowerCase()] || codec.toUpperCase())
 const bytes = (value: number) => {
   if (!value) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -40,6 +41,7 @@ function App() {
   const queryClient = useQueryClient()
   const [libraryId, setLibraryId] = useState('')
   const [query, setQuery] = useState('')
+  const [videoCodec, setVideoCodec] = useState('')
   const [dvProfile, setDvProfile] = useState('')
   const [hdr10Plus, setHdr10Plus] = useState(false)
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('')
@@ -50,10 +52,11 @@ function App() {
   const params = new URLSearchParams({ limit: '500' })
   if (libraryId) params.set('library_id', libraryId)
   if (query.trim()) params.set('search', query.trim())
+  if (videoCodec) params.set('codec_name', videoCodec)
   if (dvProfile) params.set('dolby_vision_profile', dvProfile)
   if (hdr10Plus) params.set('has_hdr10_plus', 'true')
   if (healthFilter) params.set('health', healthFilter)
-  const files = useQuery({ queryKey: ['files', libraryId, query, dvProfile, hdr10Plus, healthFilter], queryFn: () => api<MediaFile[]>(`/api/v1/files?${params}`) })
+  const files = useQuery({ queryKey: ['files', libraryId, query, videoCodec, dvProfile, hdr10Plus, healthFilter], queryFn: () => api<MediaFile[]>(`/api/v1/files?${params}`) })
   const scans = useQuery({ queryKey: ['scans'], queryFn: () => api<Scan[]>('/api/v1/scans?limit=10'), refetchInterval: 1000 })
 
   const startScan = useMutation({
@@ -132,9 +135,13 @@ function App() {
 
       <section className="library-panel">
         <div className="panel-head">
-          <div><h2>Media browser</h2><p>{visibleFiles.length} visible files{query ? ' · database search active' : ''}{healthFilter ? ' · health filter active' : ''}</p></div>
+          <div><h2>Media browser</h2><p>{visibleFiles.length} visible files{query ? ' · database search active' : ''}{videoCodec ? ` · ${codecLabel(videoCodec)} filter active` : ''}{healthFilter ? ' · health filter active' : ''}</p></div>
           <div className="filters">
             <label className="search"><Search size={16}/><input placeholder="Search entire library" value={query} onChange={(event) => setQuery(event.target.value)}/></label>
+            <select aria-label="Filter by video codec" value={videoCodec} onChange={(event) => setVideoCodec(event.target.value)}>
+              <option value="">All video codecs</option>
+              {Object.keys(data?.video_codecs || {}).sort((a, b) => codecLabel(a).localeCompare(codecLabel(b))).map((codec) => <option key={codec} value={codec}>{codecLabel(codec)}</option>)}
+            </select>
             <select value={dvProfile} onChange={(event) => setDvProfile(event.target.value)}><option value="">All DV profiles</option><option value="5">Profile 5</option><option value="7">Profile 7</option><option value="8">Profile 8</option></select>
             <label className="check"><input type="checkbox" checked={hdr10Plus} onChange={(event) => setHdr10Plus(event.target.checked)}/> HDR10+</label>
             {healthFilter && <button onClick={() => setHealthFilter('')}>Clear health filter</button>}
