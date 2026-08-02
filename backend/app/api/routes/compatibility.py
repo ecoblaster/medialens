@@ -26,6 +26,10 @@ from app.services.homatics_compatibility import (
     get_homatics_device_profile,
     list_homatics_device_profiles,
 )
+from app.services.xiaomi_compatibility import (
+    get_xiaomi_device_profile,
+    list_xiaomi_device_profiles,
+)
 
 router = APIRouter(prefix="/compatibility", tags=["hardware compatibility"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
@@ -53,6 +57,7 @@ def _all_device_profiles() -> list[DeviceProfile]:
         *list_device_profiles(),
         *list_google_tv_device_profiles(),
         *list_homatics_device_profiles(),
+        *list_xiaomi_device_profiles(),
     ]
 
 
@@ -61,6 +66,7 @@ def _profile_or_404(device_id: str) -> DeviceProfile:
         get_device_profile(device_id)
         or get_google_tv_device_profile(device_id)
         or get_homatics_device_profile(device_id)
+        or get_xiaomi_device_profile(device_id)
     )
     if profile is None:
         raise HTTPException(

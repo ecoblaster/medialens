@@ -1,8 +1,11 @@
 from types import SimpleNamespace
 
+from fastapi.testclient import TestClient
+
 from app.services.compatibility import evaluate_file, get_device_profile
 from app.services.google_tv_compatibility import get_google_tv_device_profile
 from app.services.homatics_compatibility import get_homatics_device_profile
+from app.services.xiaomi_compatibility import get_xiaomi_device_profile
 
 
 def _file(*, video_codec="h264", hdr="SDR", dv_profile=None, audio_codec="ac3"):
@@ -212,3 +215,51 @@ def test_ugoos_sk4_pro_accepts_av1_hdr10_plus() -> None:
     result = evaluate_file(media_file, profile)
 
     assert result.outcome == "direct_play"
+
+
+def test_xiaomi_tv_box_s_3rd_gen_accepts_av1_hdr10_plus() -> None:
+    profile = get_xiaomi_device_profile("xiaomi-tv-box-s-3rd-gen")
+    assert profile is not None
+    media_file = _file(video_codec="av1", hdr="HDR10", audio_codec="eac3")
+    media_file.video_streams[0].has_hdr10_plus = True
+
+    result = evaluate_file(media_file, profile)
+
+    assert result.outcome == "direct_play"
+
+
+def test_xiaomi_tv_box_s_3rd_gen_is_listed_by_api(client: TestClient) -> None:
+    response = client.get("/api/v1/compatibility/devices")
+
+    assert response.status_code == 200
+    devices = {device["id"]: device for device in response.json()}
+    assert devices["xiaomi-tv-box-s-3rd-gen"]["name"] == (
+        "Xiaomi TV Box S (3rd Gen)"
+    )
+
+
+def test_xiaomi_tv_box_s_3rd_gen_rejects_vc1() -> None:
+    profile = get_xiaomi_device_profile("xiaomi-tv-box-s-3rd-gen")
+    assert profile is not None
+
+    result = evaluate_file(
+        _file(video_codec="vc1", hdr="SDR", audio_codec="eac3"), profile
+    )
+
+    assert result.outcome == "video_transcode"
+    assert any(reason.code == "unsupported_video_codec" for reason in result.reasons)
+
+
+def test_xiaomi_tv_box_s_3rd_gen_rejects_dolby_vision_profile_7() -> None:
+    profile = get_xiaomi_device_profile("xiaomi-tv-box-s-3rd-gen")
+    assert profile is not None
+
+    result = evaluate_file(
+        _file(video_codec="hevc", dv_profile="7", audio_codec="eac3"), profile
+    )
+
+    assert result.outcome == "video_transcode"
+    assert any(
+        reason.code == "unsupported_dolby_vision_profile"
+        for reason in result.reasons
+    )

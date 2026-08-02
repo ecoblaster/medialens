@@ -91,9 +91,10 @@ Advanced library management remains available through the API documentation at `
 - Guided first-run library setup
 - Dolby Vision profile, HDR10, HDR10+, and SDR analysis
 - Dolby Atmos, DTS:X, lossless audio, subtitle, bitrate, and codec analysis
-- Hardware compatibility profiles for NVIDIA Shield, Apple TV, Fire TV Cube, and Ugoos devices
+- Hardware compatibility profiles for NVIDIA Shield, Apple TV, Fire TV Cube, Google TV,
+  Homatics, Xiaomi, and Ugoos devices
 - Automatic scanning with file-copy stability checks and periodic reconciliation
-- Full-library search and quality-health filters
+- Full-library search plus video-codec and quality-health filters
 - Read-only library mounts; MediaLens never modifies source media
 
 ## Data and upgrades
