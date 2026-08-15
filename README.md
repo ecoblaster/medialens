@@ -94,7 +94,7 @@ Advanced library management remains available through the API documentation at `
 - Hardware compatibility profiles for NVIDIA Shield, Apple TV, Fire TV Cube, Google TV,
   Homatics, Xiaomi, and Ugoos devices
 - Automatic scanning with file-copy stability checks and periodic reconciliation
-- Full-library search plus video-codec and quality-health filters
+- Full-library search plus video-codec, Dolby Vision format, and quality-health filters
 - Read-only library mounts; MediaLens never modifies source media
 
 ## Data and upgrades

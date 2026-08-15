@@ -11,6 +11,7 @@ type Stream = Record<string, unknown>
 type MediaFile = { id: string; library_id: string; relative_path: string; filename: string; container?: string; size_bytes: number; scan_status: string; last_error?: string; media_item: { title: string; year?: number; item_type: string }; video_streams: Stream[]; audio_streams: Stream[]; subtitle_streams: Stream[] }
 type Scan = { id: string; library_id: string; status: string; files_discovered: number; files_analyzed: number; files_skipped: number; files_failed: number; current_relative_path?: string; current_filename?: string; current_stage?: string; current_file_started_at?: string; current_stage_started_at?: string; average_seconds_per_file?: number; estimated_remaining_seconds?: number }
 type HealthFilter = '' | 'hdr_metadata_missing' | 'failed_scans' | 'no_subtitles' | 'missing_audio_language'
+type DolbyVisionFormat = '' | '4' | '5' | '7-fel' | '7-mel' | '8.1' | '8.4'
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init })
@@ -20,6 +21,23 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 const pairs = (value?: Record<string, number>) => Object.entries(value || {}).map(([name, count]) => ({ name, count }))
 const codecLabel = (codec: string) => ({ h264: 'H.264', h265: 'H.265', hevc: 'HEVC', av1: 'AV1', vp9: 'VP9' }[codec.toLowerCase()] || codec.toUpperCase())
+const dolbyVisionFormats: { value: Exclude<DolbyVisionFormat, ''>; label: string }[] = [
+  { value: '4', label: 'Profile 4' },
+  { value: '5', label: 'Profile 5' },
+  { value: '7-fel', label: 'Profile 7 FEL' },
+  { value: '7-mel', label: 'Profile 7 MEL' },
+  { value: '8.1', label: 'Profile 8.1' },
+  { value: '8.4', label: 'Profile 8.4' },
+]
+const dolbyVisionFormatLabel = (format: DolbyVisionFormat) => dolbyVisionFormats.find((item) => item.value === format)?.label || 'Dolby Vision'
+const dolbyVisionStreamLabel = (metadata?: Record<string, unknown>) => {
+  const profile = String(metadata?.profile || '?')
+  const elType = String(metadata?.el_type || '').toUpperCase()
+  const compatibilityId = metadata?.compatibility_id
+  if (profile === '7' && ['FEL', 'MEL'].includes(elType)) return `DV P7 ${elType}`
+  if (profile === '8' && [1, 4].includes(Number(compatibilityId))) return `DV P8.${compatibilityId}`
+  return `DV P${profile}`
+}
 const bytes = (value: number) => {
   if (!value) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -42,7 +60,7 @@ function App() {
   const [libraryId, setLibraryId] = useState('')
   const [query, setQuery] = useState('')
   const [videoCodec, setVideoCodec] = useState('')
-  const [dvProfile, setDvProfile] = useState('')
+  const [dvFormat, setDvFormat] = useState<DolbyVisionFormat>('')
   const [hdr10Plus, setHdr10Plus] = useState(false)
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('')
   const [selected, setSelected] = useState<MediaFile | null>(null)
@@ -53,10 +71,10 @@ function App() {
   if (libraryId) params.set('library_id', libraryId)
   if (query.trim()) params.set('search', query.trim())
   if (videoCodec) params.set('codec_name', videoCodec)
-  if (dvProfile) params.set('dolby_vision_profile', dvProfile)
+  if (dvFormat) params.set('dolby_vision_format', dvFormat)
   if (hdr10Plus) params.set('has_hdr10_plus', 'true')
   if (healthFilter) params.set('health', healthFilter)
-  const files = useQuery({ queryKey: ['files', libraryId, query, videoCodec, dvProfile, hdr10Plus, healthFilter], queryFn: () => api<MediaFile[]>(`/api/v1/files?${params}`) })
+  const files = useQuery({ queryKey: ['files', libraryId, query, videoCodec, dvFormat, hdr10Plus, healthFilter], queryFn: () => api<MediaFile[]>(`/api/v1/files?${params}`) })
   const scans = useQuery({ queryKey: ['scans'], queryFn: () => api<Scan[]>('/api/v1/scans?limit=10'), refetchInterval: 1000 })
 
   const startScan = useMutation({
@@ -135,14 +153,17 @@ function App() {
 
       <section className="library-panel">
         <div className="panel-head">
-          <div><h2>Media browser</h2><p>{visibleFiles.length} visible files{query ? ' · database search active' : ''}{videoCodec ? ` · ${codecLabel(videoCodec)} filter active` : ''}{healthFilter ? ' · health filter active' : ''}</p></div>
+          <div><h2>Media browser</h2><p>{visibleFiles.length} visible files{query ? ' · database search active' : ''}{videoCodec ? ` · ${codecLabel(videoCodec)} filter active` : ''}{dvFormat ? ` · ${dolbyVisionFormatLabel(dvFormat)} filter active` : ''}{healthFilter ? ' · health filter active' : ''}</p></div>
           <div className="filters">
             <label className="search"><Search size={16}/><input placeholder="Search entire library" value={query} onChange={(event) => setQuery(event.target.value)}/></label>
             <select aria-label="Filter by video codec" value={videoCodec} onChange={(event) => setVideoCodec(event.target.value)}>
               <option value="">All video codecs</option>
               {Object.keys(data?.video_codecs || {}).sort((a, b) => codecLabel(a).localeCompare(codecLabel(b))).map((codec) => <option key={codec} value={codec}>{codecLabel(codec)}</option>)}
             </select>
-            <select value={dvProfile} onChange={(event) => setDvProfile(event.target.value)}><option value="">All DV profiles</option><option value="5">Profile 5</option><option value="7">Profile 7</option><option value="8">Profile 8</option></select>
+            <select aria-label="Filter by Dolby Vision format" value={dvFormat} onChange={(event) => setDvFormat(event.target.value as DolbyVisionFormat)}>
+              <option value="">All Dolby Vision formats</option>
+              {dolbyVisionFormats.map((format) => <option key={format.value} value={format.value}>{format.label}</option>)}
+            </select>
             <label className="check"><input type="checkbox" checked={hdr10Plus} onChange={(event) => setHdr10Plus(event.target.checked)}/> HDR10+</label>
             {healthFilter && <button onClick={() => setHealthFilter('')}>Clear health filter</button>}
           </div>
@@ -153,7 +174,7 @@ function App() {
             const audio = file.audio_streams[0] as any
             const dolbyVision = video?.dolby_vision
             const inferredSdr = video?.base_hdr_format === 'SDR' || (!video?.color_transfer && video?.bit_depth && video.bit_depth <= 8)
-            const hdr = video?.has_dolby_vision ? `DV P${dolbyVision?.profile || '?'}` : video?.has_hdr10_plus ? 'HDR10+' : inferredSdr ? 'SDR' : video?.base_hdr_format === 'UNKNOWN' ? 'Metadata missing' : video?.base_hdr_format || 'Unknown'
+            const hdr = video?.has_dolby_vision ? dolbyVisionStreamLabel(dolbyVision) : video?.has_hdr10_plus ? 'HDR10+' : inferredSdr ? 'SDR' : video?.base_hdr_format === 'UNKNOWN' ? 'Metadata missing' : video?.base_hdr_format || 'Unknown'
             return <tr key={file.id} onClick={() => setSelected(file)}>
               <td><strong>{file.media_item.title}</strong><small>{file.media_item.year || ''} · {file.filename}</small></td>
               <td>{video?.codec_name?.toUpperCase() || '—'}<small>{video?.width ? `${video.width}×${video.height}` : ''}</small></td>
