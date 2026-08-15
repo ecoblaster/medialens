@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_db
@@ -10,6 +10,7 @@ from app.schemas.media import MediaFileRead
 
 router = APIRouter(prefix="/files", tags=["media files"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
+DolbyVisionFormat = Literal["4", "5", "7-fel", "7-mel", "8.1", "8.4"]
 
 
 def _file_query():
@@ -32,12 +33,28 @@ def _hdr_metadata_missing_condition():
     )
 
 
+def _dolby_vision_format_condition(dolby_vision_format: DolbyVisionFormat):
+    if dolby_vision_format in {"4", "5"}:
+        return DolbyVisionMetadata.profile == dolby_vision_format
+    if dolby_vision_format.startswith("7-"):
+        return and_(
+            DolbyVisionMetadata.profile == "7",
+            DolbyVisionMetadata.el_type == dolby_vision_format.removeprefix("7-").upper(),
+        )
+    profile, compatibility_id = dolby_vision_format.split(".", maxsplit=1)
+    return and_(
+        DolbyVisionMetadata.profile == profile,
+        DolbyVisionMetadata.compatibility_id == int(compatibility_id),
+    )
+
+
 @router.get("", response_model=list[MediaFileRead])
 def list_files(
     db: DatabaseSession,
     library_id: str | None = None,
     search: Annotated[str | None, Query(min_length=1, max_length=300)] = None,
     dolby_vision_profile: str | None = None,
+    dolby_vision_format: DolbyVisionFormat | None = None,
     has_hdr10_plus: bool | None = None,
     immersive_format: str | None = None,
     codec_name: str | None = None,
@@ -67,6 +84,14 @@ def list_files(
         query = query.where(
             MediaFile.video_streams.any(
                 VideoStream.dolby_vision.has(DolbyVisionMetadata.profile == dolby_vision_profile)
+            )
+        )
+    if dolby_vision_format:
+        query = query.where(
+            MediaFile.video_streams.any(
+                VideoStream.dolby_vision.has(
+                    _dolby_vision_format_condition(dolby_vision_format)
+                )
             )
         )
     if health == "hdr_metadata_missing":

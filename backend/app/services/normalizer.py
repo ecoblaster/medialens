@@ -139,13 +139,30 @@ def _base_hdr(stream: dict[str, Any]) -> str:
     return BaseHdrFormat.SDR.value if transfer else BaseHdrFormat.UNKNOWN.value
 
 
-def _dv(stream: dict[str, Any]) -> DolbyVisionData | None:
+def _mediainfo_dolby_vision_el_type(
+    mediainfo: dict[str, Any], video_ordinal: int
+) -> str | None:
+    tracks = _mediainfo_video_tracks(mediainfo)
+    if video_ordinal >= len(tracks):
+        return None
+    text = " ".join(str(value) for value in tracks[video_ordinal].values())
+    if re.search(r"\bFEL\b", text, re.IGNORECASE):
+        return DolbyVisionEnhancementLayer.FEL.value
+    if re.search(r"\bMEL\b", text, re.IGNORECASE):
+        return DolbyVisionEnhancementLayer.MEL.value
+    return None
+
+
+def _dv(
+    stream: dict[str, Any], mediainfo: dict[str, Any], video_ordinal: int
+) -> DolbyVisionData | None:
     for item in _side_data(stream):
         side_type = str(item.get("side_data_type") or "").lower()
         if "dovi" not in side_type and "dolby vision" not in side_type:
             continue
         profile = _as_int(item.get("dv_profile"))
         el_present = bool(_as_int(item.get("el_present_flag")) or 0)
+        el_type = _mediainfo_dolby_vision_el_type(mediainfo, video_ordinal)
         return DolbyVisionData(
             profile=str(profile) if profile is not None else "unknown",
             level=_as_int(item.get("dv_level")),
@@ -153,8 +170,15 @@ def _dv(stream: dict[str, Any]) -> DolbyVisionData | None:
             bl_present=bool(_as_int(item.get("bl_present_flag")) or 0),
             el_present=el_present,
             rpu_present=bool(_as_int(item.get("rpu_present_flag")) or 0),
-            el_type=DolbyVisionEnhancementLayer.UNKNOWN.value if el_present else DolbyVisionEnhancementLayer.NONE.value,
-            detected_by="ffprobe",
+            el_type=(
+                el_type
+                or (
+                    DolbyVisionEnhancementLayer.UNKNOWN.value
+                    if el_present
+                    else DolbyVisionEnhancementLayer.NONE.value
+                )
+            ),
+            detected_by="ffprobe+mediainfo" if el_type else "ffprobe",
         )
     return None
 
@@ -264,7 +288,7 @@ def normalize_probe(ffprobe: dict[str, Any], mediainfo: dict[str, Any], path: Pa
         index = _as_int(stream.get("index")) or 0
         if codec_type == "video":
             num, den = _fraction(stream.get("avg_frame_rate") or stream.get("r_frame_rate"))
-            dv = _dv(stream)
+            dv = _dv(stream, mediainfo, video_ordinal)
             has_hdr10_plus = (
                 _stream_has_hdr10_plus(stream)
                 or _ffprobe_probe_items_have_hdr10_plus(ffprobe, index)
