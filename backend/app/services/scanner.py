@@ -9,8 +9,14 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.base import utc_now
-from app.db.session import SessionLocal
-from app.models.enums import FileScanStatus, ItemType, MediaKind, ScanFileStatus, ScanRunStatus
+from app.models.enums import (
+    DolbyVisionEnhancementLayer,
+    FileScanStatus,
+    ItemType,
+    MediaKind,
+    ScanFileStatus,
+    ScanRunStatus,
+)
 from app.models.library import Library
 from app.models.media import (
     AudioStream,
@@ -111,7 +117,8 @@ def resolve_media_path(library: Library, relative_path: str) -> tuple[Path, str]
     if not is_supported_media_path(media_path.relative_to(root)):
         raise ScanValidationError(
             "IGNORED_MEDIA_FILE",
-            "The requested path matches a sample, temporary file, or release-group promotional clip.",
+            "The requested path matches a sample, temporary file, or "
+            "release-group promotional clip.",
             {"relative_path": media_path.relative_to(root).as_posix()},
         )
     return media_path, media_path.relative_to(root).as_posix()
@@ -267,6 +274,26 @@ def _new_scan_run(
     return scan
 
 
+def _needs_metadata_refresh(media_file: MediaFile) -> bool:
+    """Return whether an unchanged file needs newer scanner metadata.
+
+    Profile 7 rows created before RPU analysis was added contain ``UNKNOWN``
+    (or occasionally ``NONE``) for the enhancement-layer type.  Treat those
+    rows as stale so a regular library scan upgrades them without forcing a
+    costly re-probe of every unchanged file.
+    """
+    classified_el_types = {
+        DolbyVisionEnhancementLayer.FEL.value,
+        DolbyVisionEnhancementLayer.MEL.value,
+    }
+    return any(
+        stream.dolby_vision is not None
+        and stream.dolby_vision.profile == "7"
+        and stream.dolby_vision.el_type not in classified_el_types
+        for stream in media_file.video_streams
+    )
+
+
 def _scan_file(
     db: Session,
     scan_run: ScanRun,
@@ -290,6 +317,7 @@ def _scan_file(
         and existing_file.scan_status == FileScanStatus.COMPLETE.value
         and existing_file.size_bytes == stat.st_size
         and existing_file.mtime_ns == stat.st_mtime_ns
+        and not _needs_metadata_refresh(existing_file)
     ):
         scan_run.files_skipped += 1
         scan_run.file_results.append(
