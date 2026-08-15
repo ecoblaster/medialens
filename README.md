@@ -90,6 +90,7 @@ Advanced library management remains available through the API documentation at `
 
 - Guided first-run library setup
 - Dolby Vision profile, HDR10, HDR10+, and SDR analysis
+- Reliable Profile 7 FEL/MEL identification through Dolby Vision RPU analysis
 - Dolby Atmos, DTS:X, lossless audio, subtitle, bitrate, and codec analysis
 - Hardware compatibility profiles for NVIDIA Shield, Apple TV, Fire TV Cube, Google TV,
   Homatics, Xiaomi, and Ugoos devices

@@ -1,12 +1,19 @@
+import subprocess
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+import app.services.probe as probe_module
 from app.models.library import Library
 from app.models.media import DolbyVisionMetadata, MediaFile, MediaItem, VideoStream
 from app.services.normalizer import normalize_probe
+from app.services.probe import (
+    _needs_dolby_vision_el_probe,
+    _parse_dovi_tool_el_type,
+    _probe_dolby_vision_el_type,
+)
 
 
 def _media_file(
@@ -137,3 +144,92 @@ def test_normalizer_reads_profile_7_enhancement_layer_from_mediainfo(
     assert dolby_vision is not None
     assert dolby_vision.el_type == el_type
     assert dolby_vision.detected_by == "ffprobe+mediainfo"
+
+
+@pytest.mark.parametrize("el_type", ["FEL", "MEL"])
+def test_normalizer_prefers_dovi_tool_profile_7_result(el_type: str) -> None:
+    ffprobe = {
+        "medialens_dovi_probe": {"el_type": el_type},
+        "format": {"format_name": "matroska"},
+        "streams": [
+            {
+                "index": 0,
+                "codec_type": "video",
+                "codec_name": "hevc",
+                "side_data_list": [
+                    {
+                        "side_data_type": "DOVI configuration record",
+                        "dv_profile": 7,
+                        "el_present_flag": 1,
+                    }
+                ],
+            }
+        ],
+    }
+
+    normalized = normalize_probe(
+        ffprobe, {"media": {"track": [{"@type": "Video"}]}}, Path("movie.mkv")
+    )
+    dolby_vision = normalized.videos[0].dolby_vision
+
+    assert dolby_vision is not None
+    assert dolby_vision.el_type == el_type
+    assert dolby_vision.detected_by == "ffprobe+dovi_tool"
+
+
+@pytest.mark.parametrize("el_type", ["FEL", "MEL"])
+def test_parses_dovi_tool_profile_7_summary(el_type: str) -> None:
+    summary = f"Summary:\n  Frames: 24\n  Profile: 7 ({el_type})\n"
+
+    assert _parse_dovi_tool_el_type(summary) == el_type
+
+
+def test_only_runs_rpu_probe_for_dual_layer_profile_7() -> None:
+    def payload(profile: int, el_present: int) -> dict:
+        return {
+            "streams": [
+                {
+                    "codec_type": "video",
+                    "side_data_list": [
+                        {
+                            "side_data_type": "DOVI configuration record",
+                            "dv_profile": profile,
+                            "el_present_flag": el_present,
+                        }
+                    ],
+                }
+            ]
+        }
+
+    assert _needs_dolby_vision_el_probe(payload(7, 1)) is True
+    assert _needs_dolby_vision_el_probe(payload(7, 0)) is False
+    assert _needs_dolby_vision_el_probe(payload(8, 0)) is False
+
+
+def test_profile_7_probe_extracts_sample_and_reads_rpu_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commands: list[list[str]] = []
+
+    def run_command(
+        command: list[str], tool_name: str, *, timeout: int
+    ) -> subprocess.CompletedProcess[str]:
+        del tool_name, timeout
+        commands.append(command)
+        stdout = ""
+        if command[:2] == ["dovi_tool", "info"]:
+            stdout = "Summary:\n  Frames: 24\n  Profile: 7 (FEL)\n"
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    monkeypatch.setattr(probe_module, "_run_command", run_command)
+    monkeypatch.setattr(
+        probe_module, "_tool_version", lambda command: "dovi_tool 2.3.3"
+    )
+
+    result = _probe_dolby_vision_el_type(Path("movie.mkv"))
+
+    assert result["el_type"] == "FEL"
+    assert result["tool_version"] == "dovi_tool 2.3.3"
+    assert commands[0][0] == "ffmpeg"
+    assert commands[1][:2] == ["dovi_tool", "extract-rpu"]
+    assert commands[2][:2] == ["dovi_tool", "info"]

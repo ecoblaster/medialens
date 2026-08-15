@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
+import tempfile
 import threading
 import time
 from contextlib import contextmanager
@@ -234,6 +236,106 @@ def _needs_dynamic_hdr_probe(ffprobe: dict[str, Any]) -> bool:
     return False
 
 
+def _needs_dolby_vision_el_probe(ffprobe: dict[str, Any]) -> bool:
+    streams = ffprobe.get("streams")
+    if not isinstance(streams, list):
+        return False
+    for stream in streams:
+        if not isinstance(stream, dict) or stream.get("codec_type") != "video":
+            continue
+        side_data = stream.get("side_data_list")
+        if not isinstance(side_data, list):
+            continue
+        for item in side_data:
+            if not isinstance(item, dict):
+                continue
+            side_type = str(item.get("side_data_type") or "").lower()
+            if "dovi" not in side_type and "dolby vision" not in side_type:
+                continue
+            try:
+                profile = int(item.get("dv_profile"))
+                el_present = bool(int(item.get("el_present_flag") or 0))
+            except (TypeError, ValueError):
+                continue
+            if profile == 7 and el_present:
+                return True
+    return False
+
+
+def _parse_dovi_tool_el_type(summary: str) -> str | None:
+    match = re.search(r"\bProfile:\s*7\s*\((FEL|MEL)\)", summary, re.IGNORECASE)
+    return match.group(1).upper() if match else None
+
+
+def _probe_dolby_vision_el_type(path: Path) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="medialens-dovi-") as directory:
+        temporary = Path(directory)
+        sample_path = temporary / "sample.hevc"
+        rpu_path = temporary / "rpu.bin"
+
+        _stage("Extracting Dolby Vision sample")
+        _run_command(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:v:0",
+                "-t",
+                "1",
+                "-c:v",
+                "copy",
+                "-bsf:v",
+                "hevc_mp4toannexb",
+                "-an",
+                "-sn",
+                "-dn",
+                "-f",
+                "hevc",
+                str(sample_path),
+            ],
+            "ffmpeg Dolby Vision sample probe",
+            timeout=30,
+        )
+        _stage("Analyzing Dolby Vision enhancement layer")
+        _run_command(
+            [
+                "dovi_tool",
+                "extract-rpu",
+                "-i",
+                str(sample_path),
+                "-o",
+                str(rpu_path),
+            ],
+            "dovi_tool RPU extraction",
+            timeout=30,
+        )
+        summary = _run_text_command(
+            ["dovi_tool", "info", "-s", "-i", str(rpu_path)],
+            "dovi_tool RPU analysis",
+            timeout=15,
+        )
+        el_type = _parse_dovi_tool_el_type(summary)
+        if el_type is None:
+            raise ProbeError("dovi_tool did not identify a Profile 7 FEL or MEL layer.")
+        return {
+            "el_type": el_type,
+            "summary": summary,
+            "tool_version": _tool_version(["dovi_tool", "--version"]),
+        }
+
+
+def _optional_dolby_vision_el_probe(path: Path) -> dict[str, Any]:
+    try:
+        return _probe_dolby_vision_el_type(path)
+    except ProbeCancelled:
+        raise
+    except ProbeError as exc:
+        return {"error": str(exc)}
+
+
 def _hdr_sample_intervals(duration: float | None) -> str:
     if duration is None or duration < 4:
         return "%+#64"
@@ -293,6 +395,8 @@ def probe_media(path: Path) -> ProbeResult:
     mediainfo["medialens_hdr_summary"] = _mediainfo_hdr_summary(path)
     if _needs_dynamic_hdr_probe(ffprobe):
         ffprobe["medialens_hdr10_plus_probe"] = _probe_dynamic_hdr(path, ffprobe)
+    if _needs_dolby_vision_el_probe(ffprobe):
+        ffprobe["medialens_dovi_probe"] = _optional_dolby_vision_el_probe(path)
     _stage("Reading probe versions")
     return ProbeResult(
         ffprobe=ffprobe,
