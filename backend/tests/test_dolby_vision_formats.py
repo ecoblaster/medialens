@@ -14,6 +14,7 @@ from app.services.probe import (
     _parse_dovi_tool_el_type,
     _probe_dolby_vision_el_type,
 )
+from app.services.scanner import _needs_metadata_refresh
 
 
 def _media_file(
@@ -99,6 +100,41 @@ def test_filters_files_by_dolby_vision_format(
     assert [media_file["media_item"]["title"] for media_file in response.json()] == [
         expected_title
     ]
+
+
+@pytest.mark.parametrize("el_type", ["UNKNOWN", "NONE"])
+def test_regular_scan_refreshes_stale_profile_7_metadata(el_type: str) -> None:
+    library = Library(
+        name="Movies",
+        media_kind="movies",
+        source_type="filesystem",
+        root_path="/media/movies",
+    )
+    media_file = _media_file(
+        library, title="Stale Profile 7", profile="7", el_type=el_type
+    )
+
+    assert _needs_metadata_refresh(media_file) is True
+
+
+@pytest.mark.parametrize(
+    ("profile", "el_type"),
+    [("7", "FEL"), ("7", "MEL"), ("8", "UNKNOWN")],
+)
+def test_regular_scan_keeps_current_dolby_vision_metadata_skippable(
+    profile: str, el_type: str
+) -> None:
+    library = Library(
+        name="Movies",
+        media_kind="movies",
+        source_type="filesystem",
+        root_path="/media/movies",
+    )
+    media_file = _media_file(
+        library, title="Current Dolby Vision", profile=profile, el_type=el_type
+    )
+
+    assert _needs_metadata_refresh(media_file) is False
 
 
 @pytest.mark.parametrize("el_type", ["FEL", "MEL"])
