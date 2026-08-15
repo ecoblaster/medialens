@@ -9,7 +9,7 @@ type Library = { id: string; name: string; media_kind: string }
 type Summary = { total_files: number; total_size_bytes: number; scan_complete: number; scan_failed: number; hdr10: number; hdr10_plus: number; dolby_vision: number; dolby_vision_profiles: Record<string, number>; atmos: number; dts_x: number; hdr_formats: Record<string, number>; video_codecs: Record<string, number>; audio_formats: Record<string, number>; resolutions: Record<string, number>; library_health: Record<string, number> }
 type Stream = Record<string, unknown>
 type MediaFile = { id: string; library_id: string; relative_path: string; filename: string; container?: string; size_bytes: number; scan_status: string; last_error?: string; media_item: { title: string; year?: number; item_type: string }; video_streams: Stream[]; audio_streams: Stream[]; subtitle_streams: Stream[] }
-type Scan = { id: string; library_id: string; status: string; files_discovered: number; files_analyzed: number; files_skipped: number; files_failed: number; current_relative_path?: string; current_filename?: string; current_stage?: string; current_file_started_at?: string; current_stage_started_at?: string; average_seconds_per_file?: number; estimated_remaining_seconds?: number }
+type Scan = { id: string; library_id: string; mode: 'full' | 'single_file'; status: string; files_discovered: number; files_analyzed: number; files_skipped: number; files_failed: number; current_relative_path?: string; current_filename?: string; current_stage?: string; current_file_started_at?: string; current_stage_started_at?: string; average_seconds_per_file?: number; estimated_remaining_seconds?: number }
 type HealthFilter = '' | 'hdr_metadata_missing' | 'failed_scans' | 'no_subtitles' | 'missing_audio_language'
 type DolbyVisionFormat = '' | '4' | '5' | '7-fel' | '7-mel' | '8.1' | '8.4'
 
@@ -87,7 +87,8 @@ function App() {
   })
 
   const visibleFiles = files.data || []
-  const activeScan = scans.data?.find((scan) => ['queued', 'running', 'cancelling'].includes(scan.status))
+  const activeScans = scans.data?.filter((scan) => ['queued', 'running', 'cancelling'].includes(scan.status)) || []
+  const activeScan = activeScans.find((scan) => scan.mode === 'full')
   const activeLibrary = activeScan ? libraries.data?.find((library) => library.id === activeScan.library_id) : undefined
   const activeLibraryName = activeLibrary?.name || (activeScan ? `Library ${activeScan.library_id.slice(0, 8)}` : '')
   const data = summary.data
@@ -98,7 +99,7 @@ function App() {
       <div><div className="brand"><Sparkles size={20}/> MediaLens <span className="version">0.6.2-dev</span></div><p>Read-only media capability intelligence</p></div>
       <div className="toolbar">
         <select value={libraryId} onChange={(event) => setLibraryId(event.target.value)}><option value="">All libraries</option>{libraries.data?.map((library) => <option key={library.id} value={library.id}>{library.name}</option>)}</select>
-        <button className="primary" disabled={!libraryId || Boolean(activeScan) || startScan.isPending} onClick={() => libraryId && startScan.mutate(libraryId)}><RefreshCw size={16}/> Scan library</button>
+        <button className="primary" disabled={!libraryId || activeScans.length > 0 || startScan.isPending} onClick={() => libraryId && startScan.mutate(libraryId)}><RefreshCw size={16}/> Scan library</button>
         <a className="ghost" href="/docs" target="_blank">API docs</a>
       </div>
     </header>

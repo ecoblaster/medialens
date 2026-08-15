@@ -450,6 +450,10 @@ def scan_single_file(
         requested_relative_path=canonical_relative,
     )
     scan_run.files_discovered = 1
+    # Publish the correct scope before probing. Automatic single-file scans can
+    # remain active for several minutes, and status readers use a separate DB
+    # session that cannot see this counter until it is committed.
+    db.commit()
     started = time.monotonic()
     existing = db.scalar(
         select(MediaFile).where(
