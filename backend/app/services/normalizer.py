@@ -153,8 +153,21 @@ def _mediainfo_dolby_vision_el_type(
     return None
 
 
+def _dovi_tool_dolby_vision_el_type(ffprobe: dict[str, Any]) -> str | None:
+    probe = ffprobe.get("medialens_dovi_probe")
+    if not isinstance(probe, dict):
+        return None
+    el_type = str(probe.get("el_type") or "").upper()
+    if el_type in {
+        DolbyVisionEnhancementLayer.FEL.value,
+        DolbyVisionEnhancementLayer.MEL.value,
+    }:
+        return el_type
+    return None
+
+
 def _dv(
-    stream: dict[str, Any], mediainfo: dict[str, Any], video_ordinal: int
+    stream: dict[str, Any], ffprobe: dict[str, Any], mediainfo: dict[str, Any], video_ordinal: int
 ) -> DolbyVisionData | None:
     for item in _side_data(stream):
         side_type = str(item.get("side_data_type") or "").lower()
@@ -162,7 +175,11 @@ def _dv(
             continue
         profile = _as_int(item.get("dv_profile"))
         el_present = bool(_as_int(item.get("el_present_flag")) or 0)
-        el_type = _mediainfo_dolby_vision_el_type(mediainfo, video_ordinal)
+        dovi_tool_el_type = _dovi_tool_dolby_vision_el_type(ffprobe)
+        mediainfo_el_type = _mediainfo_dolby_vision_el_type(
+            mediainfo, video_ordinal
+        )
+        el_type = dovi_tool_el_type or mediainfo_el_type
         return DolbyVisionData(
             profile=str(profile) if profile is not None else "unknown",
             level=_as_int(item.get("dv_level")),
@@ -178,7 +195,13 @@ def _dv(
                     else DolbyVisionEnhancementLayer.NONE.value
                 )
             ),
-            detected_by="ffprobe+mediainfo" if el_type else "ffprobe",
+            detected_by=(
+                "ffprobe+dovi_tool"
+                if dovi_tool_el_type
+                else "ffprobe+mediainfo"
+                if mediainfo_el_type
+                else "ffprobe"
+            ),
         )
     return None
 
@@ -288,7 +311,7 @@ def normalize_probe(ffprobe: dict[str, Any], mediainfo: dict[str, Any], path: Pa
         index = _as_int(stream.get("index")) or 0
         if codec_type == "video":
             num, den = _fraction(stream.get("avg_frame_rate") or stream.get("r_frame_rate"))
-            dv = _dv(stream, mediainfo, video_ordinal)
+            dv = _dv(stream, ffprobe, mediainfo, video_ordinal)
             has_hdr10_plus = (
                 _stream_has_hdr10_plus(stream)
                 or _ffprobe_probe_items_have_hdr10_plus(ffprobe, index)
