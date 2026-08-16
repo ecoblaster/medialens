@@ -2,6 +2,11 @@
 
 MediaLens is a read-only media library analyzer for movies and TV shows. It scans local media with FFprobe and MediaInfo, presents HDR and audio capability information, evaluates playback-device compatibility, and automatically imports new files after they finish copying.
 
+![Scanner](https://github.com/ecoblaster/medialens/blob/main/Scanner.png)
+![Scanner](https://github.com/ecoblaster/medialens/blob/main/Hardware-Compatibility.png)
+![Scanner](https://github.com/ecoblaster/medialens/blob/main/Format-Analyzer.png)
+![Scanner](https://github.com/ecoblaster/medialens/blob/main/Media-Browser.png)
+
 ## MediaLens 1.1.0
 
 The stable image is published as:
