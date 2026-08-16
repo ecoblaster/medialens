@@ -4,7 +4,6 @@
   <Repository>ghcr.io/ecoblaster/medialens:latest</Repository>
   <Registry>https://ghcr.io</Registry>
   <Icon>https://raw.githubusercontent.com/ecoblaster/MediaLens/main/frontend/public/favicon.svg</Icon>
-  <Banner>https://raw.githubusercontent.com/ecoblaster/MediaLens/main/frontend/public/favicon.svg</Banner>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>bash</Shell>
