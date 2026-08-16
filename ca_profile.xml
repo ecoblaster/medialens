@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CommunityApplications>
+  <Profile>
+    MediaLens is a self-hosted, read-only media library analyzer for Unraid. It
+    scans movie and TV libraries and provides an overview of Dolby Vision
+    profiles and enhancement layers, HDR10+, video and audio codecs, immersive
+    audio formats, library health, and playback-device compatibility. This
+    repository maintains the MediaLens Docker application. For documentation,
+    updates, or support, visit the GitHub repository and open an issue.
+  </Profile>
+  <Icon>https://raw.githubusercontent.com/ecoblaster/MediaLens/main/frontend/public/favicon.svg</Icon>
+  <WebPage>https://github.com/ecoblaster/MediaLens</WebPage>
+</CommunityApplications>
