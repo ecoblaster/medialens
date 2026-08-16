@@ -2,7 +2,7 @@
 <Container version="2">
   <Name>MediaLens</Name>
   <Repository>ghcr.io/ecoblaster/medialens:latest</Repository>
-  <Registry>https://ghcr.io</Registry>
+  <Registry>https://ghcr.io/ecoblaster/medialens</Registry>
   <Icon>https://raw.githubusercontent.com/ecoblaster/MediaLens/main/frontend/public/favicon.svg</Icon>
   <Network>bridge</Network>
   <MyIP/>
