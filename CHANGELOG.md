@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Reliability
+
+- Fixed TV and multi-version scans failing when SQLite-loaded timestamps were
+  compared with freshly created UTC-aware timestamps.
+
+## 1.1.0 — 2026-07-29
+
+### Setup and library management
+
+- Added a guided first-run setup wizard for movie and TV libraries.
+- Grouped multiple physical files for the same title as media versions and
+  selected the highest-quality file as the primary version.
+
+### Analysis and compatibility
+
+- Added video codec and detailed Dolby Vision format filters.
+- Added reliable Dolby Vision Profile 7 FEL/MEL identification from RPU data.
+- Expanded playback-device compatibility profiles.
+
+### Container release
+
+- Docker Hub image: `ecoblaster/medialens:1.1.0`
+- GitHub Container Registry mirror: `ghcr.io/ecoblaster/medialens:1.1.0`
+
 ## 1.0.0 — 2026-07-29
 
 First stable MediaLens release.
