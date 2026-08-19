@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db.base import utc_now
 from app.models.library import Library
 from app.models.media import MediaFile, MediaItem, VideoStream
 from app.services.media_versions import normalize_title_identity
@@ -76,3 +77,65 @@ def test_files_for_same_movie_are_grouped_as_versions(db_session: Session) -> No
         "4K · HDR10",
     }
     assert next(media_file for media_file in files if media_file.is_primary).id == uhd_file.id
+
+
+def test_grouping_handles_mixed_sqlite_timestamp_awareness(
+    db_session: Session,
+) -> None:
+    library = Library(
+        name="TV Shows",
+        media_kind="tv",
+        source_type="filesystem",
+        root_path="/media/tv",
+    )
+    first_item = MediaItem(
+        library=library,
+        item_type="episode",
+        title="Pilot",
+        year=2022,
+        season_number=1,
+        episode_number=1,
+    )
+    first_file = MediaFile(
+        library=library,
+        media_item=first_item,
+        relative_path="Example Show/Season 01/Example Show S01E01 1080p.mkv",
+        filename="Example Show S01E01 1080p.mkv",
+        size_bytes=2_000_000_000,
+        scan_status="complete",
+        video_streams=[_video(1920, 1080)],
+    )
+    db_session.add_all([library, first_file])
+    db_session.commit()
+
+    first_item_id = first_item.id
+    db_session.expire_all()
+    persisted_item = db_session.get(MediaItem, first_item_id)
+    assert persisted_item is not None
+    assert persisted_item.created_at.tzinfo is None
+
+    second_item = MediaItem(
+        library=library,
+        item_type="episode",
+        title="Pilot",
+        year=2022,
+        season_number=1,
+        episode_number=1,
+        created_at=utc_now(),
+    )
+    second_file = MediaFile(
+        library=library,
+        media_item=second_item,
+        relative_path="Example Show/Season 01/Example Show S01E01 2160p.mkv",
+        filename="Example Show S01E01 2160p.mkv",
+        size_bytes=6_000_000_000,
+        scan_status="complete",
+        video_streams=[_video(3840, 2160, hdr="HDR10")],
+    )
+    db_session.add(second_file)
+    db_session.commit()
+
+    items = list(db_session.scalars(select(MediaItem)).all())
+    files = list(db_session.scalars(select(MediaFile)).all())
+    assert len(items) == 1
+    assert {media_file.media_item_id for media_file in files} == {items[0].id}

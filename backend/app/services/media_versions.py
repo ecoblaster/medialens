@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session, selectinload
@@ -106,6 +107,14 @@ def _primary_rank(media_file: MediaFile) -> tuple[int, int, int, int, str]:
     )
 
 
+def _created_at_key(item: MediaItem) -> datetime:
+    """Return a consistently UTC-aware key for SQLite and fresh ORM rows."""
+    value = item.created_at
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _preferred_item(items: Iterable[MediaItem]) -> MediaItem:
     return min(
         items,
@@ -113,7 +122,7 @@ def _preferred_item(items: Iterable[MediaItem]) -> MediaItem:
             0 if item.external_id else 1,
             0 if item.external_guid else 1,
             len(item.title),
-            item.created_at,
+            _created_at_key(item),
             item.id,
         ),
     )
